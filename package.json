@@ -1,0 +1,39 @@
+{
+  "name": "cc-quota-monitor",
+  "productName": "Command Code Quota Monitor",
+  "version": "1.0.0",
+  "description": "Desktop quota monitor for Command Code (commandcode.ai) GOAT plan — 5-hour / weekly / monthly limits, always-on-top widget, and the full GOAT model price table.",
+  "main": "src/main/main.js",
+  "author": "cc-quota-monitor contributors",
+  "license": "MIT",
+  "keywords": [
+    "command-code",
+    "commandcode",
+    "quota",
+    "usage-limits",
+    "electron",
+    "desktop-widget",
+    "ai-coding-agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "electron .",
+    "demo": "electron . --demo",
+    "selftest": "node scripts/selftest.mjs",
+    "privacy": "node scripts/privacy-scan.mjs",
+    "pricing": "node scripts/fetch-pricing.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "smoke": "electron . --smoke",
+    "verify": "electron . --verify",
+    "verify:demo": "electron . --demo --verify",
+    "uitest": "electron . --uitest",
+    "uitest:demo": "electron . --demo --uitest",
+    "shot": "electron . --shot",
+    "shots:demo": "electron . --demo --shot"
+  },
+  "devDependencies": {
+    "electron": "31.7.7"
+  }
+}

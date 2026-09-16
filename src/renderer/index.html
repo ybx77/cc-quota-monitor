@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self';"
+    />
+    <title>Command Code 额度监控</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-theme="dark">
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo">CC</div>
+          <div class="brand-text">
+            <div class="brand-title">Command Code 额度监控</div>
+            <div class="brand-sub" id="brand-sub">正在加载…</div>
+          </div>
+        </div>
+
+        <nav class="tabs" id="tabs">
+          <button class="tab active" data-tab="overview">概览</button>
+          <button class="tab" data-tab="history">用量历史</button>
+          <button class="tab" data-tab="pricing">模型价目表</button>
+          <button class="tab" data-tab="settings">设置</button>
+          <button class="tab" data-tab="diagnostics">诊断</button>
+        </nav>
+
+        <div class="topbar-actions">
+          <div class="chip" id="account-chip" title="当前账号">
+            <span class="dot" id="status-dot"></span>
+            <span id="account-name">—</span>
+          </div>
+          <div class="chip plan" id="plan-chip">—</div>
+          <button class="icon-btn" id="btn-widget" title="显示 / 隐藏悬浮窗">▤</button>
+          <button class="icon-btn" id="btn-theme" title="切换主题">◐</button>
+          <button class="btn primary" id="btn-refresh">
+            刷新 <span class="muted small" id="refresh-eta"></span>
+          </button>
+        </div>
+      </header>
+
+      <div class="alert-bar hidden" id="alert-bar"></div>
+
+      <main class="content">
+        <!-- ============================= 概览 ============================= -->
+        <section class="pane active" id="pane-overview">
+          <div class="grid windows" id="window-cards"></div>
+
+          <div class="grid kpis" id="kpi-cards"></div>
+
+          <div class="grid two">
+            <div class="card">
+              <div class="card-head">
+                <h3>消耗速率与预测</h3>
+                <span class="muted small" id="derived-note">基于本地采样</span>
+              </div>
+              <div class="table-wrap">
+                <table class="mini-table">
+                  <thead>
+                    <tr>
+                      <th>窗口</th>
+                      <th>当前速率</th>
+                      <th>剩余额度可撑</th>
+                      <th>撑到重置所需速率</th>
+                      <th>状态</th>
+                    </tr>
+                  </thead>
+                  <tbody id="projection-body"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head">
+                <h3>套餐与订阅</h3>
+                <button class="link" id="btn-open-usage">打开官方用量页 ↗</button>
+              </div>
+              <div class="kv" id="plan-kv"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>智能建议</h3>
+              <span class="muted small">依据剩余额度、速率与官方价格自动生成</span>
+            </div>
+            <ul class="tips" id="tips"></ul>
+          </div>
+        </section>
+
+        <!-- ============================= 历史 ============================= -->
+        <section class="pane" id="pane-history">
+          <div class="card">
+            <div class="card-head">
+              <h3>额度消耗曲线</h3>
+              <div class="toolbar">
+                <div class="seg" id="range-seg">
+                  <button class="seg-btn active" data-range="21600000">6 小时</button>
+                  <button class="seg-btn" data-range="86400000">24 小时</button>
+                  <button class="seg-btn" data-range="604800000">7 天</button>
+                  <button class="seg-btn" data-range="2592000000">30 天</button>
+                </div>
+                <div class="seg" id="mode-seg">
+                  <button class="seg-btn active" data-mode="used">已用 $</button>
+                  <button class="seg-btn" data-mode="remain">剩余 $</button>
+                  <button class="seg-btn" data-mode="pct">使用率 %</button>
+                </div>
+              </div>
+            </div>
+            <canvas id="history-chart" height="280"></canvas>
+            <div class="legend" id="chart-legend"></div>
+          </div>
+
+          <div class="grid kpis" id="history-stats"></div>
+
+          <div class="card">
+            <div class="card-head">
+              <h3>最近采样</h3>
+              <div class="toolbar">
+                <button class="btn small" id="btn-export-history">导出 CSV</button>
+                <button class="btn small danger" id="btn-clear-history">清空历史</button>
+              </div>
+            </div>
+            <div class="table-wrap scroll">
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>5 小时已用</th>
+                    <th>每周已用</th>
+                    <th>每月已用</th>
+                    <th>周期花费</th>
+                    <th>请求数</th>
+                  </tr>
+                </thead>
+                <tbody id="samples-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- =========================== 模型价目表 =========================== -->
+        <section class="pane" id="pane-pricing">
+          <div class="card">
+            <div class="card-head">
+              <h3>GOAT 套餐模型价目表</h3>
+              <div class="toolbar">
+                <span class="muted small" id="pricing-meta">—</span>
+                <button class="btn small" id="btn-reload-pricing">重新抓取官方数据</button>
+              </div>
+            </div>
+
+            <div class="profile">
+              <label>
+                计算窗口
+                <select id="cap-window">
+                  <option value="fiveHour">5 小时 (剩余额度)</option>
+                  <option value="weekly">每周</option>
+                  <option value="monthly">每月</option>
+                </select>
+              </label>
+              <label>新鲜输入 tokens<input type="number" id="p-fresh" value="800" min="0" step="100" /></label>
+              <label>缓存读取 tokens<input type="number" id="p-cache" value="50000" min="0" step="1000" /></label>
+              <label>输出 tokens<input type="number" id="p-out" value="175" min="0" step="25" /></label>
+              <label class="check"><input type="checkbox" id="p-only-goat" /> 仅显示官方给出请求量估算的模型</label>
+              <label class="check"><input type="checkbox" id="p-hide-free" /> 隐藏免费模型</label>
+            </div>
+
+            <div class="toolbar wrap">
+              <input type="search" id="model-search" placeholder="搜索模型名 / ID / 厂商…" />
+              <div class="seg" id="sort-seg">
+                <button class="seg-btn active" data-sort="cost">按单次成本</button>
+                <button class="seg-btn" data-sort="input">按输入价</button>
+                <button class="seg-btn" data-sort="output">按输出价</button>
+                <button class="seg-btn" data-sort="intelligence">按智能分</button>
+                <button class="seg-btn" data-sort="tps">按速度</button>
+                <button class="seg-btn" data-sort="name">按名称</button>
+              </div>
+              <button class="btn small" id="btn-export-pricing">导出价目表 CSV</button>
+            </div>
+
+            <div class="table-wrap scroll">
+              <table class="mini-table sortable">
+                <thead>
+                  <tr>
+                    <th>模型</th>
+                    <th>ID</th>
+                    <th class="num">上下文</th>
+                    <th class="num">智能分</th>
+                    <th class="num">tok/s</th>
+                    <th class="num">输入 $/1M</th>
+                    <th class="num">输出 $/1M</th>
+                    <th class="num">缓存读 $/1M</th>
+                    <th class="num">缓存写 $/1M</th>
+                    <th class="num">单次成本</th>
+                    <th class="num" id="th-capacity">还能跑</th>
+                    <th class="num">官方 5h/周/月</th>
+                  </tr>
+                </thead>
+                <tbody id="models-body"></tbody>
+              </table>
+            </div>
+            <div class="muted small" id="pricing-foot"></div>
+          </div>
+        </section>
+
+        <!-- ============================= 设置 ============================= -->
+        <section class="pane" id="pane-settings">
+          <div class="grid two">
+            <div class="card">
+              <div class="card-head"><h3>账号与连接</h3><span class="muted small" id="cred-source">—</span></div>
+              <div class="form">
+                <label class="row">
+                  <span>凭据来源</span>
+                  <select id="s-cred-mode">
+                    <option value="auto">自动读取 Command Code CLI 登录态（推荐）</option>
+                    <option value="manual">手动填写 API Key</option>
+                  </select>
+                </label>
+                <label class="row" id="row-api-key">
+                  <span>API Key</span>
+                  <input type="password" id="s-api-key" placeholder="user_xxxxxxxx…" autocomplete="off" />
+                </label>
+                <div class="row" id="row-auth-file">
+                  <span>登录态文件</span>
+                  <code id="auth-file-path" class="muted">—</code>
+                </div>
+                <label class="row">
+                  <span>API Base URL</span>
+                  <input type="text" id="s-base-url" />
+                </label>
+                <div class="row actions">
+                  <button class="btn" id="btn-test-auth">测试连接</button>
+                  <button class="btn small" id="btn-copy-key">复制当前 Key</button>
+                  <span class="muted small" id="test-result"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>刷新</h3></div>
+              <div class="form">
+                <label class="row"><span>自动刷新</span><input type="checkbox" id="s-auto-refresh" /></label>
+                <label class="row">
+                  <span>刷新间隔</span>
+                  <select id="s-interval">
+                    <option value="15">15 秒</option>
+                    <option value="30">30 秒</option>
+                    <option value="60">1 分钟</option>
+                    <option value="120">2 分钟</option>
+                    <option value="300">5 分钟</option>
+                    <option value="600">10 分钟</option>
+                  </select>
+                </label>
+                <label class="row"><span>智能加速（悬浮窗显示时用更快间隔，剩余不足 15% 自动提速）</span><input type="checkbox" id="s-smart" /></label>
+                <label class="row" id="row-widget-interval">
+                  <span>悬浮窗加速间隔</span>
+                  <select id="s-widget-interval">
+                    <option value="10">10 秒</option>
+                    <option value="15">15 秒</option>
+                    <option value="20">20 秒</option>
+                    <option value="30">30 秒</option>
+                    <option value="60">1 分钟</option>
+                  </select>
+                </label>
+                <label class="row"><span>请求超时 (ms)</span><input type="number" id="s-timeout" min="3000" step="1000" /></label>
+                <div class="row actions"><button class="btn" id="btn-refresh-now">立即刷新</button></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>悬浮窗</h3><span class="muted small">实时生效</span></div>
+              <div class="form">
+                <label class="row"><span>启用悬浮窗</span><input type="checkbox" id="w-enabled" /></label>
+                <label class="row"><span>总在最前</span><input type="checkbox" id="w-top" /></label>
+                <label class="row"><span>锁定位置</span><input type="checkbox" id="w-locked" /></label>
+                <label class="row"><span>鼠标穿透（不可点击，避免挡操作）</span><input type="checkbox" id="w-click" /></label>
+                <label class="row"><span>紧凑模式</span><input type="checkbox" id="w-compact" /></label>
+                <label class="row">
+                  <span>布局方向</span>
+                  <select id="w-orient">
+                    <option value="vertical">纵向</option>
+                    <option value="horizontal">横向</option>
+                  </select>
+                </label>
+                <label class="row"><span>透明度 <b id="w-opacity-val">0.94</b></span><input type="range" id="w-opacity" min="0.2" max="1" step="0.02" /></label>
+                <label class="row"><span>缩放 <b id="w-scale-val">1.0</b></span><input type="range" id="w-scale" min="0.7" max="2" step="0.05" /></label>
+                <div class="row"><span>显示窗口</span>
+                  <span class="inline-checks">
+                    <label class="check"><input type="checkbox" id="w-fh" /> 5 小时</label>
+                    <label class="check"><input type="checkbox" id="w-wk" /> 每周</label>
+                    <label class="check"><input type="checkbox" id="w-mo" /> 每月</label>
+                  </span>
+                </div>
+                <div class="row"><span>显示内容</span>
+                  <span class="inline-checks">
+                    <label class="check"><input type="checkbox" id="w-countdown" /> 倒计时</label>
+                    <label class="check"><input type="checkbox" id="w-spent" /> 已用金额</label>
+                    <label class="check"><input type="checkbox" id="w-spark" /> 迷你曲线</label>
+                    <label class="check"><input type="checkbox" id="w-header" /> 标题栏</label>
+                  </span>
+                </div>
+                <label class="row"><span>强调色</span><input type="color" id="w-accent" /></label>
+                <div class="row actions">
+                  <button class="btn small" id="btn-widget-reset">重置到右上角</button>
+                  <button class="btn small" id="btn-widget-toggle">显示 / 隐藏</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>提醒</h3></div>
+              <div class="form">
+                <label class="row"><span>预警阈值 <b id="th-warn-val">70</b>%</span><input type="range" id="th-warn" min="10" max="95" step="5" /></label>
+                <label class="row"><span>严重阈值 <b id="th-critical-val">90</b>%</span><input type="range" id="th-critical" min="20" max="99" step="1" /></label>
+                <label class="row"><span>达到预警阈值时通知</span><input type="checkbox" id="th-notify-warn" /></label>
+                <label class="row"><span>达到严重阈值时通知</span><input type="checkbox" id="th-notify-critical" /></label>
+                <label class="row"><span>额度用尽时通知</span><input type="checkbox" id="th-notify-exceeded" /></label>
+                <label class="row"><span>窗口即将重置时通知</span><input type="checkbox" id="th-notify-reset" /></label>
+                <div class="row actions"><button class="btn small" id="btn-notify-test">发送测试通知</button></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>外观与系统</h3></div>
+              <div class="form">
+                <label class="row">
+                  <span>主题</span>
+                  <select id="s-theme">
+                    <option value="dark">深色</option>
+                    <option value="light">浅色</option>
+                    <option value="system">跟随系统</option>
+                  </select>
+                </label>
+                <label class="row">
+                  <span>托盘显示窗口</span>
+                  <select id="s-tray-window">
+                    <option value="fiveHour">5 小时窗口</option>
+                    <option value="weekly">每周窗口</option>
+                    <option value="monthly">每月窗口</option>
+                  </select>
+                </label>
+                <label class="row"><span>开机自启</span><input type="checkbox" id="s-launch" /></label>
+                <label class="row"><span>开机时最小化到托盘</span><input type="checkbox" id="s-start-min" /></label>
+                <label class="row"><span>关闭窗口时最小化到托盘（不退出）</span><input type="checkbox" id="s-close-tray" /></label>
+                <label class="row"><span>全局快捷键（显示 / 隐藏悬浮窗）</span><input type="text" id="s-hotkey" placeholder="CommandOrControl+Shift+Q" /></label>
+                <div class="row actions"><button class="btn small" id="btn-hotkey">重新注册快捷键</button></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-head"><h3>数据</h3></div>
+              <div class="form">
+                <label class="row"><span>记录历史采样</span><input type="checkbox" id="s-history" /></label>
+                <label class="row"><span>历史保留天数</span><input type="number" id="s-retention" min="1" max="365" /></label>
+                <label class="row"><span>每周自动更新模型价目表（官方数据）</span><input type="checkbox" id="s-auto-pricing" /></label>
+                <div class="row actions">
+                  <button class="btn small" id="btn-export-json">导出完整快照 JSON</button>
+                  <button class="btn small" id="btn-export-csv2">导出历史 CSV</button>
+                  <button class="btn small" id="btn-clear-history2">清空历史</button>
+                  <button class="btn small danger" id="btn-reset-settings">恢复默认设置</button>
+                </div>
+                <div class="row muted small" id="data-paths"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================= 诊断 ============================= -->
+        <section class="pane" id="pane-diagnostics">
+          <div class="grid two">
+            <div class="card">
+              <div class="card-head"><h3>运行信息</h3><button class="btn small" id="btn-diag-copy">复制全部</button></div>
+              <pre class="code" id="diag-info">加载中…</pre>
+            </div>
+            <div class="card">
+              <div class="card-head"><h3>最近日志</h3><span class="muted small">settings.json 同目录 app.log</span></div>
+              <pre class="code scroll" id="diag-log">加载中…</pre>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>API 原始返回</h3><span class="muted small">whoami / credits / subscriptions / usage summary</span></div>
+            <pre class="code scroll tall" id="diag-raw">加载中…</pre>
+          </div>
+        </section>
+      </main>
+
+      <footer class="statusbar">
+        <span id="status-left">—</span>
+        <span id="status-right" class="muted"></span>
+      </footer>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

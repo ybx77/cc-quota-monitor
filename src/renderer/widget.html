@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>额度悬浮窗</title>
+    <link rel="stylesheet" href="widget.css" />
+  </head>
+  <body data-orientation="vertical" data-compact="false">
+    <div class="widget" id="widget">
+      <div class="whead" id="whead">
+        <div class="wtitle">
+          <span class="wdot" id="wdot"></span>
+          <span id="wtitle-text">GOAT 额度</span>
+        </div>
+        <div class="wactions">
+          <button class="wbtn" id="b-refresh" title="立即刷新">⟳</button>
+          <button class="wbtn" id="b-pin" title="切换置顶">📌</button>
+          <button class="wbtn" id="b-open" title="打开主面板">⤢</button>
+          <button class="wbtn" id="b-menu" title="更多">⋯</button>
+          <button class="wbtn" id="b-close" title="隐藏悬浮窗">✕</button>
+        </div>
+      </div>
+
+      <div class="rows" id="rows"></div>
+
+      <div class="spark-wrap" id="spark-wrap">
+        <canvas id="spark" width="560" height="68"></canvas>
+      </div>
+
+      <div class="clickthrough-hint hidden" id="ct-hint">
+        <span>穿透中</span><span class="ct-key" id="ct-key">Ctrl+Shift+Q</span><span>恢复</span>
+      </div>
+
+      <div class="wfoot">
+        <span id="wfoot-left">—</span>
+        <span id="wfoot-right" class="muted"></span>
+      </div>
+
+      <div class="menu hidden" id="menu">
+        <button data-act="open">打开主面板</button>
+        <button data-act="top">总在最前</button>
+        <button data-act="click">鼠标穿透</button>
+        <button data-act="compact">紧凑模式</button>
+        <button data-act="orient">横向 / 纵向</button>
+        <button data-act="lock">锁定位置</button>
+        <button data-act="near">贴边吸附</button>
+        <button data-act="reset">重置位置</button>
+        <button data-act="hide">隐藏悬浮窗</button>
+        <button data-act="quit" class="danger">退出应用</button>
+      </div>
+    </div>
+    <script src="widget.js"></script>
+  </body>
+</html>
